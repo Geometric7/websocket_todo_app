@@ -1,26 +1,95 @@
 import React from 'react';
+import io from 'socket.io-client';
+import { v4 as uuidv4 } from 'uuid';
 
 class App extends React.Component {
-  render () {
-    return(
-      <div className='App'>
-        <header>
-          <h1> ToDoList.app</h1>
-        </header>
-        <section className='tasks-section' id='tasks-section'>
-          <h2>Tasks</h2>
-        </section>
-        <ul className='tasks-section__list' id='tasks-list'>
-          <li className='task'>Shopping <button className='btn btn--red'>Remove</button></li>
-          <li className='task'>Go out with a dog <button className='btn btn--red'>Remove</button></li>
-        </ul>
-        <form id='add-task-form'>
-          <input className='text-input' autoComplete='off' type='text' placeholder='Type your description' id='task-name' />
-          <button className='btn' type='submit'>Add</button>
-        </form>
-      </div>
-    );
+
+  state = {
+    tasks: [],
+    taskName: '',
+  }
+
+  componentDidMount() {
+    this.socket = io('http://localhost:8000');
+    console.log(this.socket);
+    this.socket.on('updateData', (tasks) => this.updateData(tasks));
+    this.socket.on('addTask', (task) => this.addTask(task));
+    this.socket.on('removeTask', (id) => this.removeTask(id));
   };
+
+  updateData = (tasks) => {
+  this.setState({
+    tasks: tasks,
+  });
+};
+
+addTask = (task) => {
+  this.setState({
+    tasks: [...this.state.tasks, task]
+  });
+};
+
+submitForm = (e) => {
+  e.preventDefault();
+  const task = {id: uuidv4(), name: this.state.taskName};
+  this.addTask(task)
+  this.socket.emit('addTask', task);
+  this.setState({
+    taskName: '',
+  });
+};
+
+removeTask = (id, local) => {
+  const filtered = this.state.tasks.filter(task => task.id !== id);
+  this.setState({
+    tasks: filtered,
+  });
+  if (local) this.socket.emit('removeTask', id);
+};
+
+render() {
+  const { tasks, taskName } = this.state;
+  return (
+    <div className="App">
+
+      <header>
+        <h1>ToDoList.app</h1>
+      </header>
+
+      <section className="tasks-section" id="tasks-section">
+        <h2>Tasks</h2>
+
+        <ul className="tasks-section__list" id="tasks-list">
+          {tasks.map(task => (
+            <li key={task.id} className="task">{task.name}
+              <button onClick={e => {
+                e.preventDefault();
+                this.removeTask(task.id, true);
+              }} className="btn btn-red">Remove</button>
+            </li>
+          ))}
+        </ul>
+
+        <form onSubmit={this.submitForm} id="add-task-form">
+          <input
+          className="text-input"
+          autoComplete="off"
+          type="text"
+          placeholder="Type your description"
+          id="task-name"
+          value={taskName}
+          onChange={event => {
+            this.setState({ taskName: event.target.value });
+          }}
+          />
+          <button className="btn" type="submit">Add</button>
+        </form>
+
+      </section>
+    </div>
+  );
+};
+
 };
 
 export default App;
